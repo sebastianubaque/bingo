@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="es" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Bingo Locutor</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; width: 100%; }
+    body { font-family: 'Outfit', sans-serif; overflow-x: hidden; }
+
+    .bingo-ball {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700; font-size: 14px;
+      color: #fff;
+      position: relative;
+      box-shadow: inset 0 -3px 6px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+    .bingo-ball::before {
+      content: '';
+      position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+      width: 16px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+    }
+    .ball-B { background: linear-gradient(135deg, #e63946, #c1121f); }
+    .ball-I { background: linear-gradient(135deg, #f4a261, #e76f51); }
+    .ball-N { background: linear-gradient(135deg, #2a9d8f, #264653); }
+    .ball-G { background: linear-gradient(135deg, #457b9d, #1d3557); }
+    .ball-O { background: linear-gradient(135deg, #6a4c93, #4a2c73); }
+
+    .big-ball {
+      width: 160px; height: 160px;
+      font-size: 54px;
+      box-shadow: inset 0 -6px 12px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .big-ball.animating {
+      animation: ballDraw 1s cubic-bezier(0.34, 1.56, 0.64, 1), ballGlow 1s ease-out;
+    }
+
+    @keyframes ballDraw {
+      0% {
+        transform: scale(0.1) translateY(-100px) rotate(-360deg);
+        opacity: 0;
+        filter: blur(16px);
+      }
+      40% {
+        transform: scale(1.4) translateY(40px) rotate(180deg);
+        opacity: 1;
+        filter: blur(2px);
+      }
+      70% {
+        transform: scale(1.15) translateY(-15px) rotate(350deg);
+      }
+      100% {
+        transform: scale(1) translateY(0) rotate(360deg);
+        opacity: 1;
+        filter: blur(0px);
+      }
+    }
+
+    @keyframes ballGlow {
+      0% { box-shadow: inset 0 -6px 12px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.3), 0 0 30px rgba(255,255,255,0.3); }
+      50% { box-shadow: inset 0 -6px 12px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.3), 0 0 60px rgba(255,255,255,0.9); }
+      100% { box-shadow: inset 0 -6px 12px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.3), 0 0 30px rgba(255,255,255,0.3); }
+    }
+
+    /* History Grid */
+    .history-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+      padding: 12px;
+      background: rgba(255,255,254,0.02);
+      border-radius: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,254,0.05);
+      border-radius: 10px;
+      padding: 8px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 10px;
+      color: rgba(255,255,254,0.6);
+      border: 1px solid rgba(255,255,254,0.1);
+      transition: all 0.2s;
+    }
+
+    .history-item:hover {
+      background: rgba(255,255,254,0.1);
+      border-color: rgba(255,255,254,0.3);
+      transform: scale(1.05);
+    }
+
+    .history-number {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    .history-order {
+      font-size: 8px;
+      color: rgba(255,255,254,0.4);
+    }
+
+    .btn-primary {
+      padding: 20px 40px;
+      border-radius: 16px;
+      font-weight: 800;
+      font-size: 18px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent);
+      animation: shine 3s infinite;
+      pointer-events: none;
+    }
+
+    @keyframes shine {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .btn-primary:active { transform: scale(0.95); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      border: 2px solid;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+    }
+
+    .toast-container {
+      position: fixed; top: 20px; left: 20px; right: 20px;
+      z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .toast {
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 13px;
+      animation: slideUp 0.3s ease-out;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+
+    @keyframes slideUp {
+      0% { transform: translateY(-30px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+
+    .board-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 3px;
+      padding: 12px;
+      background: rgba(255,255,254,0.03);
+      border-radius: 12px;
+    }
+
+    .board-cell {
+      width: 100%;
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .stat-box {
+      padding: 16px;
+      border-radius: 12px;
+      text-align: center;
+      background: rgba(255,255,254,0.05);
+      border: 1px solid rgba(255,255,254,0.08);
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: rgba(255,255,254,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .app-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    @media (max-width: 480px) {
+      .big-ball { width: 140px; height: 140px; font-size: 48px; }
+      .btn-primary { padding: 16px 32px; font-size: 16px; }
+      .bingo-ball { width: 40px; height: 40px; font-size: 12px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; margin: 16px 0; }
+      .history-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
+    }
+
+    .score-badge {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      background: linear-gradient(135deg, #e53170, #ff8906);
+      padding: 16px 24px;
+      border-radius: 50px;
+      color: #fff;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      box-shadow: 0 8px 24px rgba(229, 49, 112, 0.3);
+      z-index: 100;
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full w-full" style="background: #0f0e17; color: #ffffte;">
+  <div id="app-wrapper" class="h-full w-full flex flex-col" style="background: #0f0e17; color: #ffffte;"><!-- Toast Container -->
+   <div class="toast-container" id="toastContainer"></div><!-- Header -->
+   <header class="w-full px-4 pt-6 pb-4" style="background: rgba(15,14,23,0.95); backdrop-filter: blur(12px);">
+    <div class="flex items-center justify-between mb-2">
+     <div class="flex items-center gap-2"><img src="https://res.cloudinary.com/duxzwcnfc/image/upload/v1766340258/Sebastian_Barbara_g1g1eq.png" alt="Logo" class="app-logo" loading="lazy" onerror="this.style.background='#e53170';">
+      <h1 id="appTitle" class="text-2xl font-black" style="font-family: 'Space Mono', monospace;">Bingo</h1>
+     </div><button class="btn-secondary" style="color: #e53170; border-color: #e53170; padding: 8px 14px; font-size: 12px;" onclick="resetGame()">🔄</button>
+    </div>
+    <p style="color: rgba(255,255,254,0.4); font-size: 11px;">Panel Locutor</p>
+   </header><!-- Main Content -->
+   <main class="flex-1 w-full overflow-y-auto px-4 pb-32"><!-- Current Ball -->
+    <div class="flex flex-col items-center mt-8 mb-6">
+     <div id="currentBallDisplay" class="mb-8">
+      <div class="bingo-ball big-ball ball-N"><span>?</span>
+      </div>
+     </div><!-- Stats Row -->
+     <div class="stats-grid w-full">
+      <div class="stat-box" style="border-color: #ff8906; background: rgba(255,137,6,0.08);">
+       <div class="stat-value" style="color: #ff8906;"><span id="ballCounter">0</span>
+       </div>
+       <div class="stat-label">
+        Sacadas
+       </div>
+      </div>
+      <div class="stat-box" style="border-color: #2cb67d; background: rgba(44,182,125,0.08);">
+       <div class="stat-value" style="color: #2cb67d;"><span id="statRemaining">75</span>
+       </div>
+       <div class="stat-label">
+        Quedan
+       </div>
+      </div>
+      <div class="stat-box" style="border-color: #7f5af0; background: rgba(127,90,240,0.08);">
+       <div class="stat-value" style="color: #7f5af0;"><span id="statPercent">0</span>%
+       </div>
+       <div class="stat-label">
+        Progreso
+       </div>
+      </div>
+     </div>
+    </div><!-- Draw Button -->
+    <div class="fixed bottom-20 left-4 right-4 z-50"><button id="drawBallBtn" class="btn-primary" style="background: linear-gradient(135deg, #e53170, #ff6b9d); color: #fff;" onclick="drawBall()"> <span id="drawBtnText">¡Sacar Balota!</span> </button>
+    </div><!-- Score Badge - Cronómetro -->
+    <div class="score-badge" id="scoreBadge"><span id="timerDisplay">00:00</span>
+    </div><!-- Historial de Últimas Balotas -->
+    <div class="mt-12 mb-6">
+     <h3 style="color: rgba(255,255,254,0.5); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; font-weight: 700; margin-bottom: 12px; padding: 0 4px;">Historial</h3>
+     <div class="history-grid" id="historyGrid"></div>
+    </div><!-- Tablero Compacto -->
+    <div class="mt-12 mb-6">
+     <h3 style="color: rgba(255,255,254,0.5); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; font-weight: 700; margin-bottom: 12px; padding: 0 4px;">Tablero</h3>
+     <div class="board-grid" id="compactBoard"></div>
+    </div>
+   </main><!-- Footer -->
+   <footer class="w-full py-3 text-center" style="color: rgba(255,255,254,0.3); font-size: 11px; border-top: 1px solid rgba(255,255,254,0.06); position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15,14,23,0.95);"><span id="footerText">Bingo © 2025</span>
+   </footer>
+  </div>
+  <script>
+  // ==================== STATE ====================
+  let allData = [];
+  let gameStartTime = null;
+  let gameTimerInterval = null;
+
+  function getLetterForNumber(n) {
+    if (n >= 1 && n <= 15) return 'B';
+    if (n >= 16 && n <= 30) return 'I';
+    if (n >= 31 && n <= 45) return 'N';
+    if (n >= 46 && n <= 60) return 'G';
+    if (n >= 61 && n <= 75) return 'O';
+    return '?';
+  }
+
+  // ==================== HELPERS ====================
+  function getDraws() {
+    return allData.filter(d => d.type === 'draw').sort((a, b) => a.draw_order - b.draw_order);
+  }
+
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    const colors = {
+      success: 'background: #2cb67d; color: #0f0e17;',
+      error: 'background: #e53170; color: #fff;',
+      info: 'background: #1a1a2e; color: #ffffte; border: 1px solid rgba(255,255,254,0.1);',
+      warning: 'background: #ff8906; color: #0f0e17;'
+    };
+    toast.className = 'toast';
+    toast.style.cssText = colors[type] || colors.info;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
+  function updateHistory() {
+    const draws = getDraws();
+    const grid = document.getElementById('historyGrid');
+    
+    if (draws.length === 0) {
+      grid.innerHTML = '';
+      return;
+    }
+
+    let html = '';
+    draws.forEach(d => {
+      const letter = getLetterForNumber(d.draw_number);
+      const colors = { B: '#e63946', I: '#f4a261', N: '#2a9d8f', G: '#457b9d', O: '#6a4c93' };
+      html += `
+        <div class="history-item" style="background: ${colors[letter]}40; border-color: ${colors[letter]}80;">
+          <div class="history-number" style="color: ${colors[letter]};">${d.draw_number}</div>
+          <div class="history-order">#${d.draw_order}</div>
+        </div>
+      `;
+    });
+    
+    grid.innerHTML = html;
+    grid.scrollTop = grid.scrollHeight;
+  }
+
+  function updateCompactBoard() {
+    const container = document.getElementById('compactBoard');
+    const draws = getDraws();
+    const drawnSet = new Set(draws.map(d => d.draw_number));
+
+    let html = '';
+    
+    for (let i = 1; i <= 75; i++) {
+      const num = i;
+      const isDrawn = drawnSet.has(num);
+      const letter = getLetterForNumber(num);
+      
+      if (isDrawn) {
+        const bgColors = { B: '#e63946', I: '#f4a261', N: '#2a9d8f', G: '#457b9d', O: '#6a4c93' };
+        html += `<div class="board-cell" style="background: ${bgColors[letter]}; color: #fff; font-weight: 700;">${num}</div>`;
+      } else {
+        html += `<div class="board-cell" style="background: rgba(255,255,254,0.05); color: rgba(255,255,254,0.3);">${num}</div>`;
+      }
+    }
+    
+    container.innerHTML = html;
+  }
+
+  function updateUI() {
+    const draws = getDraws();
+
+    // Current ball
+    const currentBallEl = document.getElementById('currentBallDisplay');
+    if (draws.length > 0) {
+      const last = draws[draws.length - 1];
+      const letter = getLetterForNumber(last.draw_number);
+      currentBallEl.innerHTML = `<div class="bingo-ball big-ball ball-${letter}"><span>${letter}${last.draw_number}</span></div>`;
+      const ballEl = currentBallEl.querySelector('.big-ball');
+      if (ballEl) {
+        ballEl.classList.remove('animating');
+        void ballEl.offsetWidth;
+        ballEl.classList.add('animating');
+      }
+    } else {
+      currentBallEl.innerHTML = `<div class="bingo-ball big-ball ball-N"><span>?</span></div>`;
+    }
+
+    // Stats
+    document.getElementById('ballCounter').textContent = draws.length;
+    document.getElementById('statRemaining').textContent = 75 - draws.length;
+    document.getElementById('statPercent').textContent = Math.round((draws.length / 75) * 100);
+
+    // Button state
+    const drawBtn = document.getElementById('drawBallBtn');
+    drawBtn.disabled = draws.length >= 75;
+
+    // History
+    updateHistory();
+
+    // Board
+    updateCompactBoard();
+
+    // Start timer
+    if (draws.length === 1 && !gameStartTime) {
+      gameStartTime = Date.now();
+      startGameTimer();
+    }
+  }
+
+  // ==================== TIMER ====================
+  function startGameTimer() {
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    updateTimerDisplay();
+    gameTimerInterval = setInterval(updateTimerDisplay, 100);
+  }
+
+  function stopGameTimer() {
+    if (gameTimerInterval) {
+      clearInterval(gameTimerInterval);
+      gameTimerInterval = null;
+    }
+  }
+
+  function updateTimerDisplay() {
+    if (!gameStartTime) return;
+    const elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
+    const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+    const s = (elapsed % 60).toString().padStart(2, '0');
+    document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+  }
+
+  // ==================== DRAW BALL ====================
+  async function drawBall() {
+    const draws = getDraws();
+    if (draws.length >= 75) {
+      showToast('¡Se han sacado todas las balotas!', 'info');
+      return;
+    }
+
+    const drawn = new Set(draws.map(d => d.draw_number));
+    const available = [];
+    for (let i = 1; i <= 75; i++) {
+      if (!drawn.has(i)) available.push(i);
+    }
+
+    const num = available[Math.floor(Math.random() * available.length)];
+    const letter = getLetterForNumber(num);
+    const order = draws.length + 1;
+
+    const btn = document.getElementById('drawBallBtn');
+    btn.disabled = true;
+
+    const result = await window.dataSdk.create({
+      type: 'draw',
+      draw_number: num,
+      draw_letter: letter,
+      draw_order: order,
+      draw_timestamp: new Date().toISOString()
+    });
+
+    btn.disabled = false;
+    if (!result.isOk) {
+      showToast('Error al sacar balota', 'error');
+    }
+  }
+
+  async function resetGame() {
+    const draws = getDraws();
+    for (const draw of draws) {
+      await window.dataSdk.delete(draw);
+    }
+    gameStartTime = null;
+    stopGameTimer();
+    document.getElementById('timerDisplay').textContent = '00:00';
+    showToast('Partida reiniciada', 'info');
+  }
+
+  // ==================== DATA SDK ====================
+  const dataHandler = {
+    onDataChanged(data) {
+      allData = data;
+      updateUI();
+    }
+  };
+
+  // ==================== ELEMENT SDK ====================
+  const defaultConfig = {
+    app_title: 'Bingo',
+    draw_button_text: '¡Sacar Balota!',
+    footer_text: 'Bingo © 2025',
+    primary_action_color: '#e53170',
+    font_family: 'Outfit'
+  };
+
+  function applyConfig(config) {
+    const appTitle = config.app_title || defaultConfig.app_title;
+    const drawBtnText = config.draw_button_text || defaultConfig.draw_button_text;
+    const footerTxt = config.footer_text || defaultConfig.footer_text;
+
+    document.getElementById('appTitle').textContent = appTitle;
+    document.getElementById('drawBtnText').textContent = drawBtnText;
+    document.getElementById('footerText').textContent = footerTxt;
+  }
+
+  // ==================== INIT ====================
+  async function init() {
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => {
+          applyConfig(config);
+        },
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.primary_action_color || defaultConfig.primary_action_color,
+              set: (v) => { config.primary_action_color = v; window.elementSdk.setConfig({ primary_action_color: v }); }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (v) => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); }
+          },
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ['app_title', config.app_title || defaultConfig.app_title],
+          ['draw_button_text', config.draw_button_text || defaultConfig.draw_button_text],
+          ['footer_text', config.footer_text || defaultConfig.footer_text]
+        ])
+      });
+    }
+
+    if (window.dataSdk) {
+      const result = await window.dataSdk.init(dataHandler);
+      if (!result.isOk) {
+        console.error('Failed to initialize Data SDK');
+      }
+    }
+
+    applyConfig(defaultConfig);
+  }
+
+  init();
+</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd8fb0b856b3371',t:'MTc3MTAzNDUxOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
